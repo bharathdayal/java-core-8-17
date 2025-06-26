@@ -104,6 +104,51 @@ public class JavaAllApplication {
 		sequentialStream.streamReverse();
 		sequentialStream.streamEmp();
 
+		//Parallel Stream
+		ParellelStream parellelStream = new ParellelStream();
+		parellelStream.parellelStream();
+
+		CompletableThread completableThread  = new CompletableThread();
+		completableThread.completableThread();
+
+		FixedThreadPool fixedThreadPool = new FixedThreadPool();
+		fixedThreadPool.FixedThread();
+
+		//Java 21 - Sequence Collections
+		SequencedCollections sequencedCollections = new SequencedCollections();
+		sequencedCollections.sequenceSet();
+
+		SequenceMap sequenceMap = new SequenceMap();
+		sequenceMap.sequenceMap();
+
+		//Java 21 - Virtual Threads
+		VirtualThread virtualThread = new VirtualThread();
+		virtualThread.virtualExecutorService();
+
+		//Java 21 -String Repeat
+		StringBuilderRepeat stringBuilderRepeat = new StringBuilderRepeat();
+		stringBuilderRepeat.stringRepeat();
+
+		sequentialStream.sortDescStream();
+		sequentialStream.streamEvenSum();
+		sequentialStream.streamSecond();
+		sequentialStream.streamCommon();
+
+		//Java String
+		StringBasics stringBasics = new StringBasics();
+		stringBasics.strEquals();
+
+		//More Streams
+		sequentialStream.removeDuplicate();
+		sequentialStream.sortReverseOrder();
+		sequentialStream.multiplesofInt(2);
+		sequentialStream.filterMutilples(11);
+		sequentialStream.filterMax();
+		sequentialStream.filterMin();
+
+		sequentialStream.commontwoArray();
+		sequentialStream.mergeTwoArray();
+
 
 
 	}
