@@ -7,6 +7,7 @@ import com.example.java_all.core.ArrayListClass.CArrayList;
 
 import com.example.java_all.core.MapClass;
 import com.example.java_all.core.StringClass.StringBasics;
+import com.example.java_all.core.Thread.CompletableFutureThread;
 import com.example.java_all.core.Thread.CompletableThread;
 import com.example.java_all.core.Thread.FixedThreadPool;
 import com.example.java_all.core.ThreadLifeCycle.NewState;
@@ -19,6 +20,8 @@ import com.example.java_all.core.polymorphismRuntime.Animal;
 import com.example.java_all.core.polymorphismRuntime.Cat;
 import com.example.java_all.core.polymorphismRuntime.Dog;
 import com.example.java_all.core.service.OrderService;
+import com.example.java_all.designpattern.FactoryDesign.PaymentFactory;
+import com.example.java_all.designpattern.FactoryDesign.PaymentProcess;
 import com.example.java_all.designpattern.SingletonLoggerClass;
 import com.example.java_all.java17.Sealed.*;
 import com.example.java_all.java21.SequenceMap;
@@ -32,18 +35,18 @@ import org.springframework.context.ApplicationContext;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @SpringBootApplication
 public class JavaAllApplication {
 
-	public static void main(String[] args) throws InterruptedException {
+	public static void main(String[] args) throws Exception {
 		ApplicationContext context = SpringApplication.run(JavaAllApplication.class, args);
 
 		SingletonLoggerClass logger = SingletonLoggerClass.getInstance();
+		System.out.println("Thread name: " + Thread.currentThread().getName());
 
 		CArrayList cArrayList=new CArrayList();
 		cArrayList.duplicateArray();
@@ -92,6 +95,7 @@ public class JavaAllApplication {
 		WaitingState w = new WaitingState();
 		w.run();
 		logger.logThread(String.valueOf(t1.getState()));
+
 
 
 		//Java17- Sealed Class
@@ -207,6 +211,83 @@ public class JavaAllApplication {
 		 MapClass mapClass = new MapClass();
 		 mapClass.HashMapBucketIndexInteger();
 		 mapClass.HashMapBucketIndexStr();
+
+		Thread thread = new Thread(() -> {
+			System.out.println("Thread is running...");
+			try {
+				Thread.sleep(1000); // TIMED_WAITING
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			System.out.println("Thread finished");
+		});
+
+		 //thread.run();
+		 System.out.println("State after Thread Obj creation: " +thread.getState());
+
+		 thread.start();
+		 System.out.println("State after start() is called: " +thread.getState());
+
+		 Thread.sleep(100);
+		 System.out.println("State during sleep: " +thread.getState());
+
+		 thread.join();
+
+		 System.out.println("State after finish: " +thread.getState());
+
+		 final Object lock = new Object();
+
+
+		ThreadPoolExecutor executor = new ThreadPoolExecutor(
+				1,
+				1,
+				1,
+				TimeUnit.SECONDS,
+				new LinkedBlockingQueue<>()
+		);
+		executor.submit(() -> {
+			System.out.println(thread.getState());
+		});
+
+		CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+			return "Hello";
+		});
+
+		future.thenApply(result-> result+" World")
+				.thenAccept(System.out::println);
+
+
+
+        Runnable task = () -> System.out.println("Name :"+Thread.currentThread().getName()+ Thread.currentThread().getState());
+		Thread runtask = new Thread(task);
+		runtask.start();
+
+		Runnable task2 = () ->System.out.println("Name :"+Thread.currentThread().getName()+ Thread.currentThread().getState());
+
+		ExecutorService runnableService = Executors.newFixedThreadPool(2);
+		runnableService.execute(task);
+		runnableService.execute(task2);
+		runnableService.submit(task);
+		runnableService.shutdown();
+
+
+		Callable<String> call = () -> {
+			Thread.sleep(500);
+			return "Result from Callable";
+		};
+		logger.log(call.call().toString());
+
+		CompletableFutureThread completableFutureThread = new CompletableFutureThread();
+		completableFutureThread.CompletableFuture();
+
+	    //Factory pattern
+		PaymentProcess gPay = PaymentFactory.getPaymentMethod("Gpay");
+		PaymentProcess applePay = PaymentFactory.getPaymentMethod("Applepay");
+
+		gPay.processPayment();
+		applePay.processPayment();
+
+
 
 
 	}
