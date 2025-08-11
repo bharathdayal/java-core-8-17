@@ -1,7 +1,7 @@
 pipeline {
   agent any
 
-  options { timestamps(); ansiColor('xterm') }
+  options { timestamps() }
 
   parameters {
     string(name: 'APP_NAME', defaultValue: 'myapp', description: 'Image/repo name')
