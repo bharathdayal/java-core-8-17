@@ -5,7 +5,7 @@ pipeline {
 
   parameters {
     string(name: 'APP_NAME', defaultValue: 'myapp', description: 'Image/repo name')
-    string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'yourdockerhubuser', description: 'Docker Hub username/org')
+    string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'https://hub.docker.com/u/bharathdayal', description: 'Docker Hub username/org')
     booleanParam(name: 'RUN_CONTAINER', defaultValue: true, description: 'Run container locally after build')
     booleanParam(name: 'PUSH_DOCKER_HUB', defaultValue: true, description: 'Push image to Docker Hub')
   }
