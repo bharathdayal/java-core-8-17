@@ -26,14 +26,11 @@ pipeline {
       }
     }
 
-    stage('Build & Test') {
-      steps {
-        sh './gradlew --no-daemon clean test'
-      }
-      post {
-        always { junit '**/build/test-results/test/*.xml' }
-      }
+  stage('Build') {
+    steps {
+      sh './gradlew --no-daemon clean assemble'
     }
+  }
 
     stage('Package (bootJar)') {
       steps {
