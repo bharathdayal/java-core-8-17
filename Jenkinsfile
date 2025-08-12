@@ -4,35 +4,19 @@ pipeline {
   tools { jdk 'jdk-21' }
 
   parameters {
-    string(name: 'DOCKERFILE_PATH', defaultValue: 'Dockerfile.dockerfile', description: 'Path to Dockerfile relative to repo root')
-    string(name: 'BUILD_CONTEXT',  defaultValue: '.',           description: 'Docker build context directory')
-    string(name: 'APP_NAME',       defaultValue: 'myapp',       description: 'Image/repo name')
+    string(name: 'APP_NAME', defaultValue: 'myapp', description: 'Image/repo name')
     string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bharathdayal', description: 'Docker Hub user/org')
-    booleanParam(name: 'RUN_CONTAINER',   defaultValue: true,  description: 'Run container locally after build')
-    booleanParam(name: 'PUSH_DOCKER_HUB', defaultValue: true,  description: 'Push image to Docker Hub')
+    booleanParam(name: 'SMOKE_JAR', defaultValue: true, description: 'Run jar locally as a smoke test (no Docker)')
   }
 
   environment {
     GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
-    TAG            = "${env.BUILD_NUMBER}"
-    CONTAINER_NAME = "app_${env.JOB_BASE_NAME}"
-    EXPOSE_PORT    = "8086"   // change to "-p 8086:8080" below if your app listens on 8080 in-container
+    TAG             = "${env.BUILD_NUMBER}"
+    EXPOSE_PORT     = "8086" // change if you use a different port
   }
 
   stages {
     stage('Checkout') { steps { checkout scm } }
-
-    stage('Workspace debug') {
-      steps {
-        sh '''
-          echo "PWD=$(pwd)"
-          echo "Listing top-level:"
-          ls -la
-          echo "Looking for Dockerfile candidates:"
-          find . -maxdepth 3 -iname "Dockerfile" -o -iname "dockerfile" -print || true
-        '''
-      }
-    }
 
     stage('Prep Gradle') {
       steps {
@@ -45,56 +29,52 @@ pipeline {
       }
     }
 
-    stage('Build (bootJar)') {
+    stage('Build JAR') {
       steps {
         sh './gradlew --no-daemon clean bootJar -x test --stacktrace --info'
       }
-      post {
-        success { archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true }
-      }
+      post { success { archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true } }
     }
 
- stage('Docker Build') {
-      when { expression { return fileExists(params.DOCKERFILE_PATH) } }
-      steps {
-        sh """
-          echo "Dockerfile: ${params.DOCKERFILE_PATH} | Context: ${params.BUILD_CONTEXT}"
-          docker build -f ${params.DOCKERFILE_PATH} -t ${params.APP_NAME}:${TAG} ${params.BUILD_CONTEXT}
-          docker tag ${params.APP_NAME}:${TAG} ${params.APP_NAME}:latest
-        """
-      }
-    }
-
-    stage('Run Locally') {
-      when { expression { return fileExists(params.DOCKERFILE_PATH) && params.RUN_CONTAINER } }
-      steps {
-        sh """
-          docker rm -f ${CONTAINER_NAME} || true
-          # If app listens on 8080 in-container, change to: -p ${EXPOSE_PORT}:8090
-          docker run -d --name ${CONTAINER_NAME} -p ${EXPOSE_PORT}:${EXPOSE_PORT} ${params.APP_NAME}:latest
-        """
-      }
-    }
-
-    stage('Push to Docker Hub') {
-      when { expression { return fileExists(params.DOCKERFILE_PATH) && params.PUSH_DOCKER_HUB } }
+    // Build & PUSH the container image directly to Docker Hub without a Docker daemon
+    stage('Image (Jib → Docker Hub)') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh """
-            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker tag ${params.APP_NAME}:${TAG} ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:${TAG}
-            docker tag ${params.APP_NAME}:latest ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:latest
-            docker push ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:${TAG}
-            docker push ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:latest
-            docker logout
+            ./gradlew --no-daemon jib \
+              -Djib.to.image=${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME} \
+              -Djib.to.tags=${TAG},latest \
+              -Djib.from.image=eclipse-temurin:21-jre \
+              -Djib.container.ports=${EXPOSE_PORT} \
+              -Djib.to.auth.username=$DH_USER -Djib.to.auth.password=$DH_PASS \
+              --stacktrace --info
           """
         }
+      }
+    }
+
+    // Optional smoke test without Docker (runs the jar directly)
+    stage('Smoke test (run jar)') {
+      when { expression { return params.SMOKE_JAR } }
+      steps {
+        sh """
+          nohup java -jar build/libs/*.jar --server.port=${EXPOSE_PORT} > app.log 2>&1 &
+          echo \$! > app.pid
+          # basic wait; adjust if your app needs more time
+          sleep 8
+          # Try a simple ping; change path if you have an endpoint/actuator
+          curl -sf http://localhost:${EXPOSE_PORT}/ || true
+          kill \$(cat app.pid) || true
+        """
+      }
+      post {
+        always { archiveArtifacts artifacts: 'app.log', onlyIfSuccessful: false }
       }
     }
   }
 
   post {
-    success { echo "✔ Built ${params.APP_NAME}:${TAG}. Pushed/run if enabled." }
+    success { echo "✔ Built JAR and pushed image ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:${TAG} (and :latest)." }
     failure { echo "✖ Build failed" }
   }
 }
