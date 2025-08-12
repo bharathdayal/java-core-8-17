@@ -23,9 +23,10 @@ pipeline {
       }
     }
 
+
     stage('Build') {
       steps {
-         sh 'gradle clean bootJar -x test --no-daemon --stacktrace --info'
+          sh './gradlew --no-daemon clean bootJar -x test --stacktrace --info'
       }
       post {
         success { archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true }
