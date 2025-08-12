@@ -54,23 +54,23 @@ pipeline {
       }
     }
 
-    stage('Docker Build') {
-    agent { docker { image 'docker:27-cli' args '-v /var/run/docker.sock:/var/run/docker.sock' } }
-    steps {
-      sh "docker version"
-      sh "docker build -f ${params.DOCKERFILE_PATH} -t ${APP_NAME}:${TAG} ${params.BUILD_CONTEXT}"
-      sh "docker tag ${APP_NAME}:${TAG} ${APP_NAME}:latest"
+ stage('Docker Build') {
+      when { expression { return fileExists(params.DOCKERFILE_PATH) } }
+      steps {
+        sh """
+          echo "Dockerfile: ${params.DOCKERFILE_PATH} | Context: ${params.BUILD_CONTEXT}"
+          docker build -f ${params.DOCKERFILE_PATH} -t ${params.APP_NAME}:${TAG} ${params.BUILD_CONTEXT}
+          docker tag ${params.APP_NAME}:${TAG} ${params.APP_NAME}:latest
+        """
+      }
     }
-}
-
-    
 
     stage('Run Locally') {
       when { expression { return fileExists(params.DOCKERFILE_PATH) && params.RUN_CONTAINER } }
       steps {
         sh """
           docker rm -f ${CONTAINER_NAME} || true
-          # If your app listens on 8080 inside the container, change to: -p ${EXPOSE_PORT}:8090
+          # If app listens on 8080 in-container, change to: -p ${EXPOSE_PORT}:8090
           docker run -d --name ${CONTAINER_NAME} -p ${EXPOSE_PORT}:${EXPOSE_PORT} ${params.APP_NAME}:latest
         """
       }
