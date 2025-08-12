@@ -1,7 +1,7 @@
 pipeline {
   agent any
   options { timestamps() }
-  tools { jdk 'jdk-21' }  // make sure this tool exists
+  tools { /* jdk 'jdk-21' if you have it */ gradle 'gradle-9.0' }
 
   environment {
     GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
@@ -25,7 +25,7 @@ pipeline {
 
     stage('Build') {
       steps {
-        sh './gradlew --no-daemon clean bootJar -x test --stacktrace --info'
+         sh 'gradle clean bootJar -x test --no-daemon --stacktrace --info'
       }
       post {
         success { archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true }
