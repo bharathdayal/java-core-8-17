@@ -4,20 +4,35 @@ pipeline {
   tools { jdk 'jdk-21' }
 
   parameters {
-    booleanParam(name: 'PUSH_DOCKER_HUB', defaultValue: true, description: 'Push image to Docker Hub')
-    string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bharathdayal', description: 'Docker Hub username/org')
+    string(name: 'DOCKERFILE_PATH', defaultValue: 'Dockerfile', description: 'Path to Dockerfile relative to repo root')
+    string(name: 'BUILD_CONTEXT',  defaultValue: '.',           description: 'Docker build context directory')
+    string(name: 'APP_NAME',       defaultValue: 'myapp',       description: 'Image/repo name')
+    string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bharathdayal', description: 'Docker Hub user/org')
+    booleanParam(name: 'RUN_CONTAINER',   defaultValue: true,  description: 'Run container locally after build')
+    booleanParam(name: 'PUSH_DOCKER_HUB', defaultValue: true,  description: 'Push image to Docker Hub')
   }
 
   environment {
     GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
-    APP_NAME        = "myapp"
-    TAG             = "${env.BUILD_NUMBER}"
-    CONTAINER_NAME  = "app_${env.JOB_BASE_NAME}"
-    EXPOSE_PORT     = "8086"
+    TAG            = "${env.BUILD_NUMBER}"
+    CONTAINER_NAME = "app_${env.JOB_BASE_NAME}"
+    EXPOSE_PORT    = "8086"   // change to "-p 8086:8080" below if your app listens on 8080 in-container
   }
 
   stages {
     stage('Checkout') { steps { checkout scm } }
+
+    stage('Workspace debug') {
+      steps {
+        sh '''
+          echo "PWD=$(pwd)"
+          echo "Listing top-level:"
+          ls -la
+          echo "Looking for Dockerfile candidates:"
+          find . -maxdepth 3 -iname "Dockerfile" -o -iname "dockerfile" -print || true
+        '''
+      }
+    }
 
     stage('Prep Gradle') {
       steps {
@@ -30,7 +45,7 @@ pipeline {
       }
     }
 
-    stage('Build') {
+    stage('Build (bootJar)') {
       steps {
         sh './gradlew --no-daemon clean bootJar -x test --stacktrace --info'
       }
@@ -40,41 +55,38 @@ pipeline {
     }
 
     stage('Docker Build') {
-      when { expression { return fileExists('Dockerfile') } }
+      when { expression { return fileExists(params.DOCKERFILE_PATH) } }
       steps {
         sh """
-          docker build -t ${APP_NAME}:${TAG} .
-          docker tag ${APP_NAME}:${TAG} ${APP_NAME}:latest
+          echo "Using Dockerfile: ${params.DOCKERFILE_PATH}"
+          echo "Build context:    ${params.BUILD_CONTEXT}"
+          docker build -f ${params.DOCKERFILE_PATH} -t ${params.APP_NAME}:${TAG} ${params.BUILD_CONTEXT}
+          docker tag ${params.APP_NAME}:${TAG} ${params.APP_NAME}:latest
         """
       }
     }
 
     stage('Run Locally') {
-      when { expression { return fileExists('Dockerfile') } }
+      when { expression { return fileExists(params.DOCKERFILE_PATH) && params.RUN_CONTAINER } }
       steps {
         sh """
           docker rm -f ${CONTAINER_NAME} || true
-          # If app listens on 8080 in-container, change to: -p ${EXPOSE_PORT}:8090
-          docker run -d --name ${CONTAINER_NAME} -p ${EXPOSE_PORT}:${EXPOSE_PORT} ${APP_NAME}:latest
+          # If your app listens on 8080 inside the container, change to: -p ${EXPOSE_PORT}:8090
+          docker run -d --name ${CONTAINER_NAME} -p ${EXPOSE_PORT}:${EXPOSE_PORT} ${params.APP_NAME}:latest
         """
       }
     }
 
     stage('Push to Docker Hub') {
-      when {
-        allOf {
-          expression { return params.PUSH_DOCKER_HUB }
-          expression { return fileExists('Dockerfile') }
-        }
-      }
+      when { expression { return fileExists(params.DOCKERFILE_PATH) && params.PUSH_DOCKER_HUB } }
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh """
             echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker tag ${APP_NAME}:${TAG} ${params.DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG}
-            docker tag ${APP_NAME}:latest ${params.DOCKERHUB_NAMESPACE}/${APP_NAME}:latest
-            docker push ${params.DOCKERHUB_NAMESPACE}/${APP_NAME}:${TAG}
-            docker push ${params.DOCKERHUB_NAMESPACE}/${APP_NAME}:latest
+            docker tag ${params.APP_NAME}:${TAG} ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:${TAG}
+            docker tag ${params.APP_NAME}:latest ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:latest
+            docker push ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:${TAG}
+            docker push ${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME}:latest
             docker logout
           """
         }
@@ -83,7 +95,7 @@ pipeline {
   }
 
   post {
-    success { echo "✔ Built ${APP_NAME}:${TAG} and pushed to ${params.DOCKERHUB_NAMESPACE}/${APP_NAME} (if enabled)." }
+    success { echo "✔ Built ${params.APP_NAME}:${TAG}. Pushed/run if enabled." }
     failure { echo "✖ Build failed" }
   }
 }
