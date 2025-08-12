@@ -37,16 +37,40 @@ pipeline {
     }
 
     // Build & PUSH the container image directly to Docker Hub without a Docker daemon
-    stage('Image (Jib → Docker Hub)') {
+    stage('Image (Jib → Docker Hub, delete tags)') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh """
-            ./gradlew --no-daemon jib \
-              -Djib.to.image=${params.DOCKERHUB_NAMESPACE}/${params.APP_NAME} \
-              -Djib.to.tags=${TAG},latest \
-              -Djib.from.image=eclipse-temurin:21-jre \
-              -Djib.container.ports=${EXPOSE_PORT} \
-              -Djib.to.auth.username=$DH_USER -Djib.to.auth.password=$DH_PASS \
+            NS='${params.DOCKERHUB_NAMESPACE}'
+            REPO='${params.APP_NAME}'
+            TAG='${TAG}'
+    
+            echo "Obtaining Docker Hub token..."
+            TOKEN=\$(curl -s -H "Content-Type: application/json" \
+              -X POST -d "{\\"username\\": \\"$DH_USER\\", \\"password\\": \\"$DH_PASS\\"}" \
+              https://hub.docker.com/v2/users/login/ | tr -d '\\n' | sed -E 's/.*"token":"([^"]+)".*/\\1/')
+    
+            delete_tag() {
+              t="\$1"
+              echo "Deleting tag: \$NS/\$REPO:\$t (ignore 404)"
+              curl -fsS -X DELETE -H "Authorization: JWT \$TOKEN" \
+                "https://hub.docker.com/v2/repositories/\$NS/\$REPO/tags/\$t/" || true
+            }
+    
+            if [ -n "\$TOKEN" ] && [ "\$TOKEN" != "null" ]; then
+              delete_tag "\$TAG"
+              delete_tag "latest"
+            else
+              echo "WARN: Could not obtain Docker Hub token; skipping tag deletes."
+            fi
+    
+            echo "Building & pushing image with Jib..."
+            ./gradlew --no-daemon jib \\
+              -Djib.to.image=\${NS}/\${REPO} \\
+              -Djib.to.tags=\${TAG},latest \\
+              -Djib.from.image=eclipse-temurin:21-jre \\
+              -Djib.container.ports=${EXPOSE_PORT} \\
+              -Djib.to.auth.username=$DH_USER -Djib.to.auth.password=$DH_PASS \\
               --stacktrace --info
           """
         }
