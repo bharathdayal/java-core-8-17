@@ -6,7 +6,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class MetricsService {
 
-    private final WebClient webClient = WebClient.create("http://localhost:8080/actuator");
+    private final WebClient webClient = WebClient.create("http://localhost:8086/actuator");
 
     public String getMetric(String metricName) {
 
@@ -19,3 +19,4 @@ public class MetricsService {
     }
 
 }
+
