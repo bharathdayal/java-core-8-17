@@ -1,7 +1,7 @@
 pipeline {
   agent any
   options { timestamps() }
-  tools { /* jdk 'jdk-21' if you have it */ gradle 'gradle-9.0' }
+  tools { jdk 'jdk-21' }
 
   environment {
     GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
