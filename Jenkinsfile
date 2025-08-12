@@ -55,16 +55,15 @@ pipeline {
     }
 
     stage('Docker Build') {
-      when { expression { return fileExists(params.DOCKERFILE_PATH) } }
-      steps {
-        sh """
-          echo "Using Dockerfile: ${params.DOCKERFILE_PATH}"
-          echo "Build context:    ${params.BUILD_CONTEXT}"
-          docker build -f ${params.DOCKERFILE_PATH} -t ${params.APP_NAME}:${TAG} ${params.BUILD_CONTEXT}
-          docker tag ${params.APP_NAME}:${TAG} ${params.APP_NAME}:latest
-        """
-      }
+    agent { docker { image 'docker:27-cli' args '-v /var/run/docker.sock:/var/run/docker.sock' } }
+    steps {
+      sh "docker version"
+      sh "docker build -f ${params.DOCKERFILE_PATH} -t ${APP_NAME}:${TAG} ${params.BUILD_CONTEXT}"
+      sh "docker tag ${APP_NAME}:${TAG} ${APP_NAME}:latest"
     }
+}
+
+    
 
     stage('Run Locally') {
       when { expression { return fileExists(params.DOCKERFILE_PATH) && params.RUN_CONTAINER } }
