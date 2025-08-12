@@ -4,7 +4,7 @@ pipeline {
   tools { jdk 'jdk-21' }
 
   parameters {
-    string(name: 'DOCKERFILE_PATH', defaultValue: 'Dockerfile', description: 'Path to Dockerfile relative to repo root')
+    string(name: 'DOCKERFILE_PATH', defaultValue: 'Dockerfile.dockerfile', description: 'Path to Dockerfile relative to repo root')
     string(name: 'BUILD_CONTEXT',  defaultValue: '.',           description: 'Docker build context directory')
     string(name: 'APP_NAME',       defaultValue: 'myapp',       description: 'Image/repo name')
     string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bharathdayal', description: 'Docker Hub user/org')
