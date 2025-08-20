@@ -1,6 +1,9 @@
 pipeline {
   agent any
-  options { timestamps() }
+  options {
+    timestamps()
+    shell('/bin/bash')   // <- force bash for all sh steps in this pipeline
+  }
   tools { jdk 'jdk-21' }
 
   parameters {
