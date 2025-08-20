@@ -2,7 +2,7 @@ pipeline {
   agent any
   options {
     timestamps()
-    shell('/bin/bash')   // <- force bash for all sh steps in this pipeline
+   
   }
   tools { jdk 'jdk-21' }
 
@@ -31,20 +31,22 @@ pipeline {
   stages {
     stage('Checkout') { steps { checkout scm } }
 
-    stage('Prep Gradle') {
-      steps {
-        sh '''
-          sed -i -e 's/\\r$//' gradlew || true
-          chmod +x gradlew
-          ./gradlew --version
-          java -version
-        '''
-      }
-    }
+
+
+ stage('Prep Gradle') {
+  steps {
+    sh 'bash -lc "set -euo pipefail; sed -i -e \'s/\\r$//\' gradlew || true; chmod +x gradlew; ./gradlew --version; java -version"'
+  }
+}
 
     stage('Build JAR') {
       steps {
-        sh './gradlew --no-daemon clean bootJar -x test --stacktrace --info'
+       sh '''
+        bash -lc "
+          set -euo pipefail
+          ./gradlew --no-daemon clean bootJar -x test --stacktrace --info
+        "
+        '''
       }
       post { success { archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true } }
     }
