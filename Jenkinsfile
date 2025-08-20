@@ -59,7 +59,7 @@ stage('Prep Gradle') {
     }
 
     // ---- NEW: Publish image to Amazon ECR using Jib (no local Docker daemon required) ----
-   stage('Publish (Jib → Amazon ECR)') {
+        stage('Publish (Jib → Amazon ECR)') {
         environment {
           AWS_DEFAULT_REGION = "${params.AWS_REGION}"  // e.g., us-east-2
           ECR_REGISTRY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
@@ -67,11 +67,23 @@ stage('Prep Gradle') {
           ECR_IMAGE    = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/${params.ECR_REPO}"
         }
         steps {
-          // Provides AWS_ACCESS_KEY_ID/SECRET(/TOKEN)
           withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
             sh '''#!/usr/bin/env bash
       set -euo pipefail
       
+      echo "Ensuring AWS CLI is available..."
+      if ! command -v aws >/dev/null 2>&1; then
+        echo "Installing AWS CLI v2 to workspace (user space)..."
+        curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
+        if command -v unzip >/dev/null 2>&1; then unzip -q awscliv2.zip; else jar xf awscliv2.zip; fi
+        ./aws/install -i "${WORKSPACE}/.aws-cli" -b "${WORKSPACE}/.local/bin"
+        export PATH="${WORKSPACE}/.local/bin:$PATH"
+      fi
+      
+      # Ensure PATH contains local bin even if aws was already present from a prior run
+      export PATH="${WORKSPACE}/.local/bin:$PATH"
+      
+      echo "AWS CLI: $(aws --version 2>&1)"
       echo "ECR Image : ${ECR_IMAGE}:${TAG}"
       echo "Region    : ${AWS_DEFAULT_REGION}"
       
@@ -79,10 +91,10 @@ stage('Prep Gradle') {
       aws ecr describe-repositories --repository-names "${ECR_REPO}" >/dev/null 2>&1 \
         || aws ecr create-repository --repository-name "${ECR_REPO}" >/dev/null
       
-      # Get ECR auth password for Jib (username must be 'AWS')
+      # Explicit ECR auth for Jib (username MUST be AWS)
       ECR_PASSWORD="$(aws ecr get-login-password --region "${AWS_DEFAULT_REGION}")"
       
-      echo "Building & pushing with Jib (explicit ECR auth)..."
+      echo "Building & pushing with Jib..."
       ./gradlew --no-daemon jib \
         -Djib.to.image="${ECR_IMAGE}" \
         -Djib.to.tags="${TAG},latest" \
@@ -95,6 +107,7 @@ stage('Prep Gradle') {
           }
         }
       }
+
 
     // Optional local smoke test
     stage('Smoke test (run jar)') {
