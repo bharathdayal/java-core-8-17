@@ -61,39 +61,33 @@ stage('Prep Gradle') {
     // ---- NEW: Publish image to Amazon ECR using Jib (no local Docker daemon required) ----
    stage('Publish (Jib → Amazon ECR)') {
         environment {
-          AWS_DEFAULT_REGION = "${params.AWS_REGION}"
+          AWS_DEFAULT_REGION = "${params.AWS_REGION}"  // e.g., us-east-2
           ECR_REGISTRY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
-          ECR_REPO     = "${params.ECR_REPO}"
-          ECR_IMAGE    = "${ECR_REGISTRY}/${params.ECR_REPO}"
+          ECR_REPO     = "${params.ECR_REPO}"          // e.g., myapp
+          ECR_IMAGE    = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com/${params.ECR_REPO}"
         }
         steps {
+          // Provides AWS_ACCESS_KEY_ID/SECRET(/TOKEN)
           withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
             sh '''#!/usr/bin/env bash
       set -euo pipefail
       
-      # Install AWS CLI v2 locally (once per workspace)
-      if ! command -v aws >/dev/null 2>&1; then
-        echo "Installing AWS CLI v2 to workspace..."
-        curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
-        if command -v unzip >/dev/null 2>&1; then unzip -q awscliv2.zip; else jar xf awscliv2.zip; fi
-        ./aws/install -i "${WORKSPACE}/.aws-cli" -b "${WORKSPACE}/.local/bin"
-        echo "export PATH=${WORKSPACE}/.local/bin:\$PATH" > "${WORKSPACE}/.aws_path"
-      fi
-      source "${WORKSPACE}/.aws_path" || true
-      
-      aws --version
-      echo "Registry   : ${ECR_REGISTRY}"
-      echo "Repository : ${ECR_REPO}"
-      echo "Image      : ${ECR_IMAGE}:${TAG}"
+      echo "ECR Image : ${ECR_IMAGE}:${TAG}"
+      echo "Region    : ${AWS_DEFAULT_REGION}"
       
       # Ensure repo exists (idempotent)
       aws ecr describe-repositories --repository-names "${ECR_REPO}" >/dev/null 2>&1 \
         || aws ecr create-repository --repository-name "${ECR_REPO}" >/dev/null
       
-      echo "Building & pushing image with Jib to ECR..."
+      # Get ECR auth password for Jib (username must be 'AWS')
+      ECR_PASSWORD="$(aws ecr get-login-password --region "${AWS_DEFAULT_REGION}")"
+      
+      echo "Building & pushing with Jib (explicit ECR auth)..."
       ./gradlew --no-daemon jib \
         -Djib.to.image="${ECR_IMAGE}" \
         -Djib.to.tags="${TAG},latest" \
+        -Djib.to.auth.username=AWS \
+        -Djib.to.auth.password="${ECR_PASSWORD}" \
         -Djib.from.image=eclipse-temurin:21-jre \
         -Djib.container.ports="${EXPOSE_PORT}" \
         --stacktrace --info
