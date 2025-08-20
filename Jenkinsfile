@@ -35,13 +35,14 @@ pipeline {
 
 stage('Prep Gradle') {
   steps {
-    sh(script: '''
-set -euo pipefail
-sed -i -e 's/\r$//' gradlew || true
-chmod +x gradlew
-./gradlew --version
-java -version
-''', shell: '/bin/bash')
+       sh '''
+      #!/bin/bash
+      set -eu
+      sed -i -e 's/\r$//' gradlew || true
+      chmod +x gradlew
+      ./gradlew --version
+      java -version
+      '''
   }
 }
 
