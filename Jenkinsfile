@@ -33,11 +33,17 @@ pipeline {
 
 
 
- stage('Prep Gradle') {
+stage('Prep Gradle') {
   steps {
-    sh 'bash -lc "set -euo pipefail; sed -i -e \'s/\\r$//\' gradlew || true; chmod +x gradlew; ./gradlew --version; java -version"'
+    sh '''#!/usr/bin/env bash
+    set -euo pipefail
+    # normalize CRLF if gradlew was checked out with Windows endings
+    sed -i -e 's/\r$//' gradlew || true
+    chmod +x gradlew
+    ./gradlew --version
+    java -version
+    '''
   }
-}
 
     stage('Build JAR') {
       steps {
