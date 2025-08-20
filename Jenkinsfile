@@ -12,7 +12,7 @@ pipeline {
     string(name: 'AWS_ACCOUNT_ID', defaultValue: '115047389529', description: 'AWS Account ID')
     string(name: 'AWS_REGION', defaultValue: 'us-east-2', description: 'AWS region')
     string(name: 'ECR_REPO', defaultValue: 'myapp', description: 'ECR repository name (usually same as APP_NAME)')
-    string(name: 'EC2_HOST', defaultValue: 'ec2-18-219-94-140.us-east-2.compute.amazonaws.co', description: 'EC2 public DNS or IP')
+    string(name: 'EC2_HOST', defaultValue: 'ec2-18-219-94-140.us-east-2.compute.amazonaws.com', description: 'EC2 public DNS or IP')
     string(name: 'EC2_USER', defaultValue: 'ubuntu', description: 'SSH user (ec2-user, ubuntu, etc.)')
   }
 
