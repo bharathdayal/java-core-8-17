@@ -44,6 +44,7 @@ stage('Prep Gradle') {
     java -version
     '''
   }
+}
 
     stage('Build JAR') {
       steps {
