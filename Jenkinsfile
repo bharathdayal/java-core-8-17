@@ -59,27 +59,36 @@ stage('Prep Gradle') {
     }
 
     // ---- NEW: Publish image to Amazon ECR using Jib (no local Docker daemon required) ----
-    stage('Publish (Jib → Amazon ECR)') {
+      stage('Publish (Jib → Amazon ECR)') {
       environment {
         AWS_DEFAULT_REGION = "${params.AWS_REGION}"
+        ECR_REGISTRY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+        ECR_REPO     = "${params.ECR_REPO}"
+        ECR_IMAGE    = "${ECR_REGISTRY}/${ECR_REPO}"
       }
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
-          
-
-            echo "Ensuring ECR repo exists: ${ECR_IMAGE}"
-            aws ecr describe-repositories --repository-names "${params.ECR_REPO}" >/dev/null 2>&1 || \
-              aws ecr create-repository --repository-names "${params.ECR_REPO}" >/dev/null
-
-            echo "Building & pushing with Jib to ECR..."
-            ./gradlew --no-daemon jib \
-              -Djib.to.image=${ECR_IMAGE} \
-              -Djib.to.tags=${TAG},latest \
-              -Djib.from.image=eclipse-temurin:21-jre \
-              -Djib.container.ports=${EXPOSE_PORT} \
-              --stacktrace --info
-          '''
+    bash -lc "
+      set -euo pipefail
+    
+      echo 'Registry   : ${ECR_REGISTRY}'
+      echo 'Repository : ${ECR_REPO}'
+      echo 'Image      : ${ECR_IMAGE}:${TAG}'
+    
+      if ! aws ecr describe-repositories --repository-names '${ECR_REPO}' >/dev/null 2>&1; then
+        echo 'Creating ECR repository: ${ECR_REPO}'
+        aws ecr create-repository --repository-name '${ECR_REPO}' >/dev/null
+      fi
+    
+      ./gradlew --no-daemon jib \
+        -Djib.to.image='${ECR_IMAGE}' \
+        -Djib.to.tags='${TAG},latest' \
+        -Djib.from.image=eclipse-temurin:21-jre \
+        -Djib.container.ports='${EXPOSE_PORT}' \
+        --stacktrace --info
+    "
+    '''
         }
       }
     }
