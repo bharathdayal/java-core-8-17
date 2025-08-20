@@ -50,7 +50,7 @@ stage('Prep Gradle') {
       steps {
        sh '''
         bash -lc "
-          set -euo pipefail
+         
           ./gradlew --no-daemon clean bootJar -x test --stacktrace --info
         "
         '''
@@ -66,7 +66,7 @@ stage('Prep Gradle') {
       steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
           sh '''
-            set -euo pipefail
+          
 
             echo "Ensuring ECR repo exists: ${ECR_IMAGE}"
             aws ecr describe-repositories --repository-names "${params.ECR_REPO}" >/dev/null 2>&1 || \
@@ -111,7 +111,7 @@ stage('Prep Gradle') {
             echo "Logging in to ECR on remote host and deploying ${ECR_IMAGE}:${TAG}"
 
             ssh -o StrictHostKeyChecking=no ${params.EC2_USER}@${params.EC2_HOST} bash -s <<'REMOTE'
-              set -euo pipefail
+              
               APP_NAME="${APP_NAME}"
               PORT="${EXPOSE_PORT}"
               ECR="${ECR_IMAGE}"
